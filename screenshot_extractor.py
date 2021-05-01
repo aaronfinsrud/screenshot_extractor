@@ -4,7 +4,7 @@ import shutil
 import os
 import tempfile
 import re
-import xlrd
+import openpyxl
 from tkinter import *
 from tkinter.filedialog import askopenfilename
 
@@ -35,18 +35,19 @@ def show_exception_and_exit(exc_type, exc_value, tb):
     input("Press <return> to exit...")
     sys.exit(-1)
 sys.excepthook = show_exception_and_exit
+##MAC
 root = Tk()
 root.update()
 root.withdraw()
 wb_path = askopenfilename()
-
+##
 
 if len(sys.argv) > 0:
-    wb_path = wb_path##sys.argv[1]##
+    wb_path = wb_path
     print(wb_path)
     print()
 else:
-    raise Exception('To convert file, drag and drop xlsx file onto screenshot_extractor.py!')
+    raise Exception('No file selected. Please close this window and run the script again.')
 
 wb_folder =  os.path.dirname(wb_path)
 # creates a temporary directory #
@@ -160,7 +161,7 @@ keys_list = []
 # helper function to extract values from excel spreadsheet
 def get_cell_range(start_col, start_row, end_col, end_row):
     key_list = []
-    column = worksheet.col(end_col)
+    ##column = worksheet.col(end_col)##
     if start_row == end_row:
       end_row = end_row+1
     if start_row == 0:
@@ -169,11 +170,15 @@ def get_cell_range(start_col, start_row, end_col, end_row):
     if end_row-start_row >= 2:
       end_row = end_row+1
     for n in range(start_row, end_row):    
-        key = (column[n]).value
+        key = worksheet.cell(row=n, column=end_col).value####(column[n]).value
         key_list.append(key)
     return key_list
+## update
+## workbook = xlrd.open_workbook(wb_path)
+## update
+workbook = openpyxl.load_workbook(wb_path)
 ##
-workbook = xlrd.open_workbook(wb_path)
+
 # iterates over sheets list
 for t, sheet in enumerate (sheets):
     image_filenames = sheet
@@ -182,18 +187,25 @@ for t, sheet in enumerate (sheets):
         sheet_num = sheet_indexes[t]
         print("sheet number")
         print(sheet_num)
-        worksheet = workbook.sheet_by_index(sheet_num-1)
+        ## update
+        ## worksheet = workbook.sheet_by_index(sheet_num-1)
+        ##update
+        worksheet = workbook.worksheets[sheet_num-1] ## double check 
+        ##
         row_range = value
         key_list = []
         # identifies column with key header
         column_headers = []
         key_column_header = ["key","keys","Keys","Key"]
-        for r in [0,0]:
-            for c in range(worksheet.ncols):
-                cell = worksheet.cell(r, c)
+        for r in [1,1]:
+            for c in range(worksheet.max_column):##
+                c = c+1
+                cell = worksheet.cell(row=r, column=c)#
+                
                 # checks for key column
                 for val in key_column_header:
-                    if cell.value == val:
+                    if cell.value and cell.value.strip() == val:
+                        
                         start_col = c
                         end_col = c  
         print("column")
@@ -202,8 +214,9 @@ for t, sheet in enumerate (sheets):
         print(row_range)
         key_list1 = []
         for rrange in row_range:
-            key_list = get_cell_range(start_col, min(rrange), end_col, max(rrange))
+            key_list = get_cell_range(start_col, min(rrange)+1, end_col, max(rrange)+1)
             key_list1.extend(key_list)
+        print("kl: ")
         print(key_list1)
         print()
         # makes keys list callable by filename
@@ -241,10 +254,64 @@ for filename in file_list:
                         t += 1
                     if cell_value in saved_files:
                         shutil.rmtree(temp_screenshot_directory)
+                        ## MAC  
                         root.destroy()
-                        print(cell_value+" used more than once.")
-                        print("Make sure each key is unique and that no two screenshots horizontally intersect with the same key row. Then try again!")
-                        raise Exception("File naming error")
+                        ##
+                        print()
+                        print("------------------------------------")
+                        print("ERROR!")
+                        print("Duplicate key: ")
+                        print(cell_value)
+                        print()
+                    
+                        print("Make sure:")
+                        print("- Each key is unique")
+                        print("- Each key aligns with no more than 1 screenshot")
+                        print("------------------------------------")
+                        print()
+                        raise Exception("DUPLICATE KEY")
+                    if not isinstance(cell_value, str) and cell_value != int(cell_value):
+                      cell_value = str(cell_value)
+                    elif not isinstance(cell_value, str) and cell_value == int(cell_value):
+                      cell_value = str(int(cell_value))
+                    else:
+                      cell_value
+                    ## handling for filenames that are too long or contain illegal chars
+                    invalid = '<>:"/\|?* '
+                    for char in invalid:
+                      if char in cell_value:
+                        print()
+                        print("------------------------------------")
+                        print("ERROR!")
+                        print("Illegal character in key: ")
+                        print(cell_value)
+                        print()
+                        print("Make sure keys do not contain any of the following characters:")
+                        print('<>:"/\|?* ')
+                        print("------------------------------------")
+                        print()
+                        shutil.rmtree(temp_screenshot_directory)
+                        ## MAC  
+                        root.destroy()
+                        ##
+                        raise Exception("ILLEGAL CHAR IN KEY")
+                        
+                      elif len(cell_value+file_extension) > 260:
+                        print()
+                        print("------------------------------------")
+                        print("ERROR!")
+                        print("Key length limit exceeded: ")
+                        print(cell_value)
+                        print()
+                        print("Make sure keys are less than 255 characters in length")
+                        print("------------------------------------")
+                        print()
+                        shutil.rmtree(temp_screenshot_directory)
+                        ## MAC  
+                        root.destroy()
+                        ##
+                        raise Exception("KEY LENGTH LIMIT EXCEEDED")
+                      
                     shutil.copyfile(screenshot_file, os.path.join(temp_screenshot_directory,"xl","media",cell_value+file_extension))
                     saved_files.append(cell_value)
     else:
